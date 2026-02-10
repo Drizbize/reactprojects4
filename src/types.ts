@@ -16,3 +16,8 @@ export type PuzzleGrid = {
     puzzleId: number;
     cells: SoundCell[][];
 };
+
+export type GroupScore = {
+    group: "A" | "B" | "C" | "D";
+    score: number;
+}

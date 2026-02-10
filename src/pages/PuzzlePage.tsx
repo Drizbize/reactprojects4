@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 
 import type { Sound, SoundCell, PuzzleGrid } from "../types";
 
@@ -21,17 +21,25 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
     const [puzzleGrid, setPuzzleGrid] = useState<PuzzleGrid | null>(null);
 
     useEffect(() => {
-        // Fetch puzzle data based on userUID, group, and difficulty
-        // Example: https://api.puzzle.codenestedu.fr/api/puzzle?uid=...&group=...&difficulty=...
-
         const fetchPuzzleData = async () => {
             try {
                 const response = await fetch(`https://api.puzzle.codenestedu.fr/api/puzzle?uid=${userUID}&group=${group}&difficulty=${difficulty}`);
                 const data = await response.json();
-                
-                
-                setSounds(data.sounds);
-                setPuzzleGrid(data.puzzleGrid);
+
+                setPuzzleGrid(
+                    {
+                        puzzleId: data.puzzleId,
+                        cells: data.cells.map((cell: any) => ({
+                            isRevealed: cell.isRevealed,
+                            sound: {
+                                id: cell.sound.id,
+                                name: cell.sound.name,
+                                instrument: cell.sound.instrument,
+                                fileUrl: cell.sound.filePath
+                            }
+                        }))
+                    }
+                );
             } catch (error) {
                 console.error("Error fetching puzzle data:", error);
             }
@@ -41,6 +49,29 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
             fetchPuzzleData();
         }
     }, [group, difficulty]);
+
+    useEffect(() => {
+        try
+        {
+            const response = fetch(`https://api.puzzle.codenestedu.fr/api/sound-ids?uid=${userUID}&puzzleId=${puzzleGrid?.puzzleId}`);
+            response.then(res => res.json())
+            .then(data => {
+                data.soundDetails.map((sound: any) => {
+                    setSounds((prevSounds) => [
+                        ...prevSounds,
+                        {
+                            id: sound.soundId,
+                            name: sound.name,
+                            instrument: sound.instrument,
+                            fileUrl: sound.fileUrl
+                        }
+                    ]);
+                })
+            });
+        } catch (error) {
+            console.error("Error fetching puzzle data:", error);
+        }
+    }, []);
 
     return (
         <>
