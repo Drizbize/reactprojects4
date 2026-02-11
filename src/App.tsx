@@ -4,11 +4,12 @@ import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import PuzzlePage from './pages/PuzzlePage'
 import GroupsPage from './pages/GroupsPage'
+import { useAuth } from './Auth'
 
 //QZ7A4P2m9D
 
 const App: React.FC = () => {
-  const [userUID, setUserUID] = useState<string>("");
+  //const uid = useAuth();
 
   return (
     <>
@@ -22,9 +23,9 @@ const App: React.FC = () => {
           </ul>
         </nav>
         <Routes>
-          <Route path="/" element={<HomePage userUID={userUID} setUserUID={setUserUID} />} />
-          <Route path="/puzzle" element={<PuzzlePage userUID={userUID} />} />
-          <Route path="/groups" element={<GroupsPage userUID={userUID} />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/puzzle" element={<PuzzlePage />} />
+          <Route path="/groups" element={<GroupsPage />} />
         </Routes>
       </BrowserRouter>
     </>

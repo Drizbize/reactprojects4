@@ -1,20 +1,24 @@
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 
-import type { Sound, SoundCell, PuzzleGrid } from "../types";
+import type { AuthContextType, Sound, SoundCell, PuzzleGrid, Group, Difficulty } from "../types";
+import { useAuth } from "../Auth";
 
-const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
-    const GROUPS: string[] = ["A", "B", "C", "D"];
-    const DIFFICULTIES: string[] = ["EASY", "MEDIUM", "HARD"];
+const PuzzlePage: React.FC= () => {
+    const {uid} = useAuth();
 
-    const [group, setGroup] = useState<string>(GROUPS[0]);
-    const [difficulty, setDifficulty] = useState<string>(DIFFICULTIES[0]);
+    const GROUPS: Group[] = ["A", "B", "C", "D"];
+    const DIFFICULTIES: Difficulty[] = ["EASY", "MEDIUM", "HARD"];
+
+    const [group, setGroup] = useState<Group>(GROUPS[0]);
+    const [difficulty, setDifficulty] = useState<Difficulty>(DIFFICULTIES[0]);
+    const [selectedSoundId, selectSoundId] = useState<number | null>(null);
 
     const handleOnGroupChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setGroup(e.target.value);
+        setGroup(e.target.value as Group);
     }
 
     const handleOnDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setDifficulty(e.target.value);
+        setDifficulty(e.target.value as Difficulty);
     }
 
     const [sounds, setSounds] = useState<Sound[]>([]);
@@ -23,37 +27,58 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
     useEffect(() => {
         const fetchPuzzleData = async () => {
             try {
-                const response = await fetch(`https://api.puzzle.codenestedu.fr/api/puzzle?uid=${userUID}&group=${group}&difficulty=${difficulty}`);
+                const response = await fetch(`https://api.puzzle.codenestedu.fr/api/puzzle?uid=${uid}&group=${group}&difficulty=${difficulty}`);
                 const data = await response.json();
+
+                let sounds:SoundCell[][] = [];
+                data.cells.forEach((cell: any) => {
+                    let sound: Sound = {
+                        id: cell.sound.id,
+                        name: cell.sound.name,
+                        instrument: cell.sound.instrument,
+                        fileUrl: cell.sound.filePath
+                    };
+
+                    let soundCell: SoundCell = {
+                        isRevealed: cell.revealed,
+                        sound: sound
+                    };
+
+                    if (sounds.at(cell.l) === undefined)
+                    {
+                        sounds[cell.l] = [];
+                    }
+
+                    sounds[cell.l][cell.c] = soundCell;
+                });
 
                 setPuzzleGrid(
                     {
                         puzzleId: data.puzzleId,
-                        cells: data.cells.map((cell: any) => ({
-                            isRevealed: cell.isRevealed,
-                            sound: {
-                                id: cell.sound.id,
-                                name: cell.sound.name,
-                                instrument: cell.sound.instrument,
-                                fileUrl: cell.sound.filePath
-                            }
-                        }))
+                        cells: sounds
                     }
                 );
+                console.log("Fetched puzzle data:", data);
             } catch (error) {
                 console.error("Error fetching puzzle data:", error);
             }
         };
 
-        if (userUID) {
+        console.log("userUID:", uid, "Group:", group, "Difficulty:", difficulty);
+
+        if (uid !== null) {
             fetchPuzzleData();
         }
     }, [group, difficulty]);
 
     useEffect(() => {
-        try
+        if (!puzzleGrid)
         {
-            const response = fetch(`https://api.puzzle.codenestedu.fr/api/sound-ids?uid=${userUID}&puzzleId=${puzzleGrid?.puzzleId}`);
+            console.log("Puzzle grid not loaded yet.");
+            return;
+        }
+        try {
+            const response = fetch(`https://api.puzzle.codenestedu.fr/api/sound-ids?uid=${uid}&puzzleId=${puzzleGrid?.puzzleId}`);
             response.then(res => res.json())
             .then(data => {
                 data.soundDetails.map((sound: any) => {
@@ -71,7 +96,60 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
         } catch (error) {
             console.error("Error fetching puzzle data:", error);
         }
-    }, []);
+    }, [puzzleGrid]);
+
+    const audio = useRef<HTMLAudioElement | null>(null);
+
+    const audioPlay = (sound: Sound) => {
+        audioStop();
+        audio.current = new Audio(`https://api.puzzle.codenestedu.fr/${sound.fileUrl}`);
+        audio.current.play();
+    };
+
+    const audioStop = () => {
+        if (audio !== null && audio.current !== null) {
+            audio.current?.pause();
+        }
+    };
+
+    const guessSelected = (tableSoundId: number, row: number, col: number) => {
+        // post method /api/guess
+        fetch(`https://api.puzzle.codenestedu.fr/api/guess`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                uid: uid,
+                difficulty: difficulty,
+                l: row,
+                c: col,
+                guessedSoundId: selectedSoundId,
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log("Guess response:", data);
+            if (data.correct) {
+                setPuzzleGrid((prevGrid) => {
+                    if (!prevGrid) 
+                        return prevGrid;
+
+                    const updatedCells = prevGrid.cells.map((row) =>
+                        row.map((cell) => {
+                            if (cell.sound.id === tableSoundId) {
+                                return { ...cell, isRevealed: true };
+                            }
+                            return cell;
+                        })
+                    );
+
+                    return { ...prevGrid, cells: updatedCells };
+                });
+                selectSoundId(null);
+            }
+        })
+    };
 
     return (
         <>
@@ -82,13 +160,13 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
             <div>
                 <select value={group} onChange={handleOnGroupChange}>
                     {GROUPS.map((grp) => (
-                        <option value={grp}>{grp}</option>
+                        <option key={grp} value={grp}>{grp}</option>
                     ))}
                 </select>
 
                 <select value={difficulty} onChange={handleOnDifficultyChange}>
                     {DIFFICULTIES.map((diff) => (
-                        <option value={diff}>{diff}</option>
+                        <option key={diff} value={diff}>{diff}</option>
                     ))}
                 </select>
             </div>
@@ -96,13 +174,12 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
             <div>
                 <div>
                     {/* Scroll menu */}
-                    {sounds.map((sound) => (
-                        <div key={sound.id}>
-                            <p>{sound.name}</p>
-                            <audio controls>
-                                <source src={sound.fileUrl} type="audio/mpeg" />
-                                Your browser does not support the audio element.
-                            </audio>
+                    {sounds.map((sound, index) => (
+                        <div key={`${sound.id}-${sound.name}-${index}`}>
+                            {sound.instrument} {sound.name}
+                            <button onClick={() => audioPlay(sound)}>Play</button>
+                            <button onClick={audioStop}>Stop</button>
+                            <button onClick={() => selectSoundId(sound.id)}>Select</button>
                         </div>
                     ))}
                 </div>
@@ -112,20 +189,23 @@ const PuzzlePage: React.FC<{ userUID: string }> = ({ userUID }) => {
                         <table>
                             <tbody>
                                 {puzzleGrid.cells.map((row, rowIndex) => (
-                                    <tr key={rowIndex}>
+                                    <tr key={`row-${rowIndex}`}>
                                         {row.map((cell, colIndex) => (
-                                            <td key={colIndex} style={{ border: '1px solid black', padding: '10px' }}>
-                                                {cell.isRevealed ? (
-                                                    <div>
-                                                        <p>{cell.sound.name}</p>
-                                                        <audio controls>
-                                                            <source src={cell.sound.fileUrl} type="audio/mpeg" />
-                                                            Your browser does not support the audio element.
-                                                        </audio>
-                                                    </div>
-                                                ) : (
-                                                    <p>Hidden</p>
-                                                )}
+                                            <td key={`cell-${rowIndex}-${colIndex}`} style={{ border: '1px solid black', padding: '10px' }}>
+                                                <div>
+                                                    <button onClick={() => audioPlay(cell.sound)}>
+                                                        Play
+                                                    </button>
+                                                    <button onClick={audioStop}>
+                                                        Stop
+                                                    </button>
+
+                                                    {(selectedSoundId !== null && cell.isRevealed === false) && (
+                                                        <button onClick={() => guessSelected(cell.sound.id, rowIndex, colIndex)}>
+                                                            Select
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         ))}
                                     </tr>

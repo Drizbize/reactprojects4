@@ -1,16 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "../Auth";
 
-const HomePage: React.FC<{ userUID: string, setUserUID: (uid: string) => void }> = ({ userUID, setUserUID }) => {
+const HomePage: React.FC = () => {
+    const [localUid, setLocalUid] = useState<string>("");
+    const {uid, authUid} = useAuth();
 
-    const [uid, setUid] = useState<string>(userUID);
-    
-    const handleOnClick = () => {
-        setUserUID(uid);
-    }
+    useEffect(() => {
+        if (uid !== null) {
+            setLocalUid(uid);
+        }
+    }, [uid]);
 
     const textOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setUid(e.target.value);
+        setLocalUid(e.target.value);
     }
+
+    const handleOnClick = () => {
+        console.log(localUid);
+        authUid(localUid);
+    };
     
     return (
         <>
@@ -24,7 +32,7 @@ const HomePage: React.FC<{ userUID: string, setUserUID: (uid: string) => void }>
             <div>
                 <label>
                     Votre UID:
-                    <input type="text" value={uid} onChange={textOnChange} name="UserUID" required/>
+                    <input type="text" value={localUid} onChange={textOnChange} required/>
                 </label>
             </div>
 

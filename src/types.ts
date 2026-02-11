@@ -1,3 +1,9 @@
+export type AuthContextType = {
+    uid: string | null;
+    authUid: (uid: string) => void;
+    deconnecter: () => void;
+};
+
 export type Sound = {
     id: number;
     name: string;
@@ -17,7 +23,10 @@ export type PuzzleGrid = {
     cells: SoundCell[][];
 };
 
+export type Group = "A" | "B" | "C" | "D";
+export type Difficulty = "EASY" | "MEDIUM" | "HARD";
+
 export type GroupScore = {
-    group: "A" | "B" | "C" | "D";
-    score: number;
+    group: Group;
+    count: number;
 }
