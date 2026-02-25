@@ -1,7 +1,8 @@
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { AuthContextType, Sound, SoundCell, PuzzleGrid, Group, Difficulty } from "../types";
+import type { Sound, SoundCell, PuzzleGrid, Group, Difficulty } from "../types";
 import { useAuth } from "../Auth";
+import getPuzzleGrid from "../API/ParserModule";
 
 const PuzzlePage: React.FC= () => {
     const {uid} = useAuth();
@@ -11,7 +12,7 @@ const PuzzlePage: React.FC= () => {
 
     const [group, setGroup] = useState<Group>(GROUPS[0]);
     const [difficulty, setDifficulty] = useState<Difficulty>(DIFFICULTIES[0]);
-    const [selectedSoundId, selectSoundId] = useState<number | null>(null);
+    const [selectedSoundId, setSelectSoundId] = useState<number | null>(null);
 
     const handleOnGroupChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setGroup(e.target.value as Group);
@@ -23,53 +24,31 @@ const PuzzlePage: React.FC= () => {
 
     const [sounds, setSounds] = useState<Sound[]>([]);
     const [puzzleGrid, setPuzzleGrid] = useState<PuzzleGrid | null>(null);
+    const [flashMessage, setFlashMessage] = useState<{ text: string; isCorrect: boolean } | null>(null);
 
     useEffect(() => {
-        const fetchPuzzleData = async () => {
-            try {
-                const response = await fetch(`https://api.puzzle.codenestedu.fr/api/puzzle?uid=${uid}&group=${group}&difficulty=${difficulty}`);
-                const data = await response.json();
+        const loadPuzzle = async () => {
+            if (!uid)
+                return;
 
-                let sounds:SoundCell[][] = [];
-                data.cells.forEach((cell: any) => {
-                    let sound: Sound = {
-                        id: cell.sound.id,
-                        name: cell.sound.name,
-                        instrument: cell.sound.instrument,
-                        fileUrl: cell.sound.filePath
-                    };
-
-                    let soundCell: SoundCell = {
-                        isRevealed: cell.revealed,
-                        sound: sound
-                    };
-
-                    if (sounds.at(cell.l) === undefined)
-                    {
-                        sounds[cell.l] = [];
-                    }
-
-                    sounds[cell.l][cell.c] = soundCell;
-                });
-
-                setPuzzleGrid(
-                    {
-                        puzzleId: data.puzzleId,
-                        cells: sounds
-                    }
-                );
-                console.log("Fetched puzzle data:", data);
+            try
+            {
+                const grid = await getPuzzleGrid(uid, group, difficulty);
+                if (grid === null)
+                {
+                    throw Error("Grid is null");
+                }
+                setPuzzleGrid(grid);
+                
+                console.log("Fetched puzzle data:", grid);
             } catch (error) {
                 console.error("Error fetching puzzle data:", error);
             }
         };
 
-        console.log("userUID:", uid, "Group:", group, "Difficulty:", difficulty);
+        loadPuzzle();
 
-        if (uid !== null) {
-            fetchPuzzleData();
-        }
-    }, [group, difficulty]);
+    }, [uid, group, difficulty]);
 
     useEffect(() => {
         if (!puzzleGrid)
@@ -131,6 +110,7 @@ const PuzzlePage: React.FC= () => {
         .then(data => {
             console.log("Guess response:", data);
             if (data.correct) {
+                setFlashMessage({ text: "Correct!", isCorrect: true });
                 setPuzzleGrid((prevGrid) => {
                     if (!prevGrid) 
                         return prevGrid;
@@ -146,13 +126,36 @@ const PuzzlePage: React.FC= () => {
 
                     return { ...prevGrid, cells: updatedCells };
                 });
-                selectSoundId(null);
+                setSelectSoundId(null);
+                setTimeout(() => setFlashMessage(null), 3000);
+            }
+            else
+            {
+                setFlashMessage({ text: "Incorrect!", isCorrect: false });
+                setTimeout(() => setFlashMessage(null), 3000);
             }
         })
     };
 
     return (
         <>
+            {flashMessage && (
+                <div style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    padding: '20px 40px',
+                    fontSize: '24px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    backgroundColor: flashMessage.isCorrect ? 'green' : 'red',
+                    borderRadius: '8px',
+                    zIndex: 1000
+                }}>
+                    {flashMessage.text}
+                </div>
+            )}
             <h1>
                 Musical Puzzle
             </h1>
@@ -179,7 +182,7 @@ const PuzzlePage: React.FC= () => {
                             {sound.instrument} {sound.name}
                             <button onClick={() => audioPlay(sound)}>Play</button>
                             <button onClick={audioStop}>Stop</button>
-                            <button onClick={() => selectSoundId(sound.id)}>Select</button>
+                            <button onClick={() => setSelectSoundId(sound.id)}>Select</button>
                         </div>
                     ))}
                 </div>
@@ -191,7 +194,8 @@ const PuzzlePage: React.FC= () => {
                                 {puzzleGrid.cells.map((row, rowIndex) => (
                                     <tr key={`row-${rowIndex}`}>
                                         {row.map((cell, colIndex) => (
-                                            <td key={`cell-${rowIndex}-${colIndex}`} style={{ border: '1px solid black', padding: '10px' }}>
+                                            <td key={`cell-${rowIndex}-${colIndex}`}
+                                                style= { cell.isRevealed === false ? { border: '2px solid black', padding: '10px' } : { border: '2px solid green', padding: '10px' }}>
                                                 <div>
                                                     <button onClick={() => audioPlay(cell.sound)}>
                                                         Play

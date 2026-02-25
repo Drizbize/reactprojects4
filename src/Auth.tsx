@@ -16,10 +16,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const authUid = (uid: string) => {
         setUserUid(uid);
+        localStorage.setItem("uid", uid);
     };
 
     const deconnecter = () => {
         setUserUid(null);
+        localStorage.removeItem("uid");
     };
 
     return (

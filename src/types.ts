@@ -30,3 +30,27 @@ export type GroupScore = {
     group: Group;
     count: number;
 }
+
+export type Person = {
+    name: string;
+    group: string;
+}
+
+export type CellPuzzleElement = {
+    puzzleId: number,
+    sound: Sound
+}
+
+export type Student = {
+    personIdentity: Person;
+    correctPlaced: number;
+    attempts: 0;
+    lastAttemptAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date | null;
+    banished: boolean;
+    banishedAt: Date | null;
+    reveals: [];
+
+    groupRevealsCount: number
+}
