@@ -1,4 +1,5 @@
-import React, { createContext, useState, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useContext } from 'react';
+import type { ReactNode } from 'react';
 // Définition du type pour le contexte (le type utilisateur peut être amélioré selon vos besoins)
 import type { AuthContextType } from './types';
 

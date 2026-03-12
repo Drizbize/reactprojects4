@@ -1,0 +1,14 @@
+.groups-container {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.groups-panel {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--panel-bg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}

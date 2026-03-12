@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../Auth";
+import "./HomePage.css";
 
 const HomePage: React.FC = () => {
     const [localUid, setLocalUid] = useState<string>("");
-    const {uid, authUid} = useAuth();
+    const { uid, authUid } = useAuth();
 
     useEffect(() => {
         if (uid !== null) {
@@ -19,27 +20,35 @@ const HomePage: React.FC = () => {
         console.log(localUid);
         authUid(localUid);
     };
-    
-    return (
-        <>
-            <h1>
-                Bienvenu au jeu Audio Puzzle
-            </h1>
-            <p>
-                Le but: decouvrir les sons caches dans un puzzle...
-            </p>
 
-            <div>
-                <label>
-                    Votre UID:
-                    <input type="text" value={localUid} onChange={textOnChange} required/>
-                </label>
+    return (
+        <div className="container home-page">
+            <div className="page-header">
+                <h1 className="text-gradient">
+                    Bienvenue au jeu Audio Puzzle
+                </h1>
+                <p>
+                    Le but : découvrir les sons cachés dans un puzzle.
+                </p>
             </div>
 
-            <button onClick={handleOnClick}>
-                Enregister UID
-            </button>
-        </>
+            <div className="glass-panel auth-form">
+                <div className="input-group">
+                    <label>Votre UID:</label>
+                    <input
+                        type="text"
+                        value={localUid}
+                        onChange={textOnChange}
+                        placeholder="Entrez votre identifiant..."
+                        required
+                    />
+                </div>
+
+                <button className="btn-primary" onClick={handleOnClick}>
+                    Enregistrer UID
+                </button>
+            </div>
+        </div>
     );
 }
 

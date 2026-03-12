@@ -1,21 +1,32 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import PuzzlePage from './pages/PuzzlePage'
 import GroupsPage from './pages/GroupsPage'
+import StudentInfoPage from './pages/StudentInfoPage'
 import { useAuth } from './Auth'
 
-//uid QZ7A4P2m9D
+// Wrapper for routes that require authentication
+const AuthenticatedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { uid } = useAuth();
+  const isConnected = uid && uid !== "";
+  
+  if (!isConnected) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
 const App: React.FC = () => {
-  const {uid, authUid, deconnecter} = useAuth();
+  const { uid, authUid, deconnecter } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  
+  const navigate = useNavigate();
+
   useEffect(() => {
     const localUid = localStorage.getItem('uid');
-    if (localUid)
-    {
+    if (localUid) {
       authUid(localUid);
       console.log("Local storage login")
     }
@@ -23,32 +34,59 @@ const App: React.FC = () => {
   }, [authUid]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex-center" style={{ height: '100vh', flexDirection: 'column', gap: '1rem' }}>
+        <div className="loading-spinner"></div>
+        <p className="text-muted">Loading Application...</p>
+      </div>
+    );
   }
 
   const isConnected = uid && uid !== "";
 
+  const handleDisconnect = () => {
+    deconnecter();
+    navigate('/');
+  };
+
   return (
-    <>
-      <BrowserRouter>
-        <nav>
-          <h1>Audio Puzzle App</h1>
-          <ul>
-            <li><Link to="/">Home</Link></li>
-            <li><Link to="/puzzle">Puzzle</Link></li>
-            <li><Link to="/groups">Groups</Link></li>
-            {isConnected && 
-              <li><a href="" onClick={deconnecter}>Disconnect</a></li>
-            }
-          </ul>
-        </nav>
+    <div className="app-container">
+      <nav className="app-navbar glass-panel">
+        <h1>Audio Puzzle</h1>
+        <ul>
+          <li><Link to="/">Home</Link></li>
+          {isConnected && (
+            <>
+              <li><Link to="/puzzle">Puzzle</Link></li>
+              <li><Link to="/groups">Groups</Link></li>
+              <li><Link to="/students">Students</Link></li>
+              <li>
+                <button className="btn-secondary" onClick={handleDisconnect}>Disconnect</button>
+              </li>
+            </>
+          )}
+        </ul>
+      </nav>
+      <main className="main-content">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/puzzle" element={<PuzzlePage />} />
-          <Route path="/groups" element={<GroupsPage />} />
+          <Route 
+            path="/puzzle" 
+            element={<AuthenticatedRoute><PuzzlePage /></AuthenticatedRoute>} 
+          />
+          <Route 
+            path="/groups" 
+            element={<AuthenticatedRoute><GroupsPage /></AuthenticatedRoute>} 
+          />
+          <Route 
+            path="/students" 
+            element={<AuthenticatedRoute><StudentInfoPage /></AuthenticatedRoute>} 
+          />
+          {/* Catch-all redirect to Home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
-    </>
+      </main>
+    </div>
   )
 }
 

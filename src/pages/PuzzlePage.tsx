@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import "./PuzzlePage.css";
 
-import type { Sound, SoundCell, PuzzleGrid, Group, Difficulty } from "../types";
+import type { Sound, PuzzleGrid, Group, Difficulty } from "../types";
 import { useAuth } from "../Auth";
-import getPuzzleGrid from "../API/ParserModule";
+import { getSoundDetails, guessSound, getPuzzleGrid } from "../API/api";
 
-const PuzzlePage: React.FC= () => {
-    const {uid} = useAuth();
+const PuzzlePage: React.FC = () => {
+    const { uid } = useAuth();
 
     const GROUPS: Group[] = ["A", "B", "C", "D"];
     const DIFFICULTIES: Difficulty[] = ["EASY", "MEDIUM", "HARD"];
@@ -13,6 +14,8 @@ const PuzzlePage: React.FC= () => {
     const [group, setGroup] = useState<Group>(GROUPS[0]);
     const [difficulty, setDifficulty] = useState<Difficulty>(DIFFICULTIES[0]);
     const [selectedSoundId, setSelectSoundId] = useState<number | null>(null);
+    const [lastListened, setLastListened] = useState<{ row: number, col: number } | null>(null);
+    const [lastListenedSidebarId, setLastListenedSidebarId] = useState<number | null>(null);
 
     const handleOnGroupChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setGroup(e.target.value as Group);
@@ -31,15 +34,13 @@ const PuzzlePage: React.FC= () => {
             if (!uid)
                 return;
 
-            try
-            {
+            try {
                 const grid = await getPuzzleGrid(uid, group, difficulty);
-                if (grid === null)
-                {
+                if (grid === null) {
                     throw Error("Grid is null");
                 }
                 setPuzzleGrid(grid);
-                
+
                 console.log("Fetched puzzle data:", grid);
             } catch (error) {
                 console.error("Error fetching puzzle data:", error);
@@ -51,119 +52,103 @@ const PuzzlePage: React.FC= () => {
     }, [uid, group, difficulty]);
 
     useEffect(() => {
-        if (!puzzleGrid)
-        {
+        if (!puzzleGrid || !uid) {
             console.log("Puzzle grid not loaded yet.");
             return;
         }
-        try {
-            const response = fetch(`https://api.puzzle.codenestedu.fr/api/sound-ids?uid=${uid}&puzzleId=${puzzleGrid?.puzzleId}`);
-            response.then(res => res.json())
-            .then(data => {
-                data.soundDetails.map((sound: any) => {
-                    setSounds((prevSounds) => [
-                        ...prevSounds,
-                        {
-                            id: sound.soundId,
-                            name: sound.name,
-                            instrument: sound.instrument,
-                            fileUrl: sound.fileUrl
-                        }
-                    ]);
-                })
-            });
-        } catch (error) {
-            console.error("Error fetching puzzle data:", error);
-        }
-    }, [puzzleGrid]);
+
+        setSounds([]); // Clear the sound list before fetching new IDs
+
+        const fetchSoundDetails = async () => {
+            try {
+                if (puzzleGrid?.puzzleId === undefined) return;
+                const soundDetails = await getSoundDetails(uid, puzzleGrid.puzzleId);
+
+                setSounds(soundDetails);
+            } catch (error) {
+                // Error already logged in API
+            }
+        };
+
+        fetchSoundDetails();
+    }, [puzzleGrid, uid]);
 
     const audio = useRef<HTMLAudioElement | null>(null);
 
     const audioPlay = (sound: Sound) => {
         audioStop();
-        audio.current = new Audio(`https://api.puzzle.codenestedu.fr/${sound.fileUrl}`);
-        audio.current.play();
+        const baseUrl = import.meta.env.VITE_API_SERVEUR.endsWith('/') 
+            ? import.meta.env.VITE_API_SERVEUR 
+            : `${import.meta.env.VITE_API_SERVEUR}/`;
+            
+        const newAudio = new Audio(`${baseUrl}${sound.fileUrl}`);
+        audio.current = newAudio;
+
+        newAudio.play().catch(error => {
+            if (error.name !== "AbortError") {
+                console.error("Audio playback error:", error);
+            }
+        });
     };
 
     const audioStop = () => {
-        if (audio !== null && audio.current !== null) {
-            audio.current?.pause();
+        if (audio.current) {
+            audio.current.pause();
+            audio.current = null;
         }
     };
 
     const guessSelected = (tableSoundId: number, row: number, col: number) => {
-        // post method /api/guess
-        fetch(`https://api.puzzle.codenestedu.fr/api/guess`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                uid: uid,
-                difficulty: difficulty,
-                l: row,
-                c: col,
-                guessedSoundId: selectedSoundId,
+        if (!uid) return;
+        guessSound(uid, difficulty, row, col, selectedSoundId)
+            .then(data => {
+                console.log("Guess response:", data);
+                if (data.correct) {
+                    setFlashMessage({ text: "Correct!", isCorrect: true });
+                    setPuzzleGrid((prevGrid) => {
+                        if (!prevGrid)
+                            return prevGrid;
+
+                        const updatedCells = prevGrid.cells.map((row) =>
+                            row.map((cell) => {
+                                if (cell.sound.id === tableSoundId) {
+                                    return { ...cell, isRevealed: true };
+                                }
+                                return cell;
+                            })
+                        );
+
+                        return { ...prevGrid, cells: updatedCells };
+                    });
+                    setSelectSoundId(null);
+                    setTimeout(() => setFlashMessage(null), 3000);
+                }
+                else {
+                    setFlashMessage({ text: "Incorrect!", isCorrect: false });
+                    setTimeout(() => setFlashMessage(null), 3000);
+                }
             })
-        })
-        .then(res => res.json())
-        .then(data => {
-            console.log("Guess response:", data);
-            if (data.correct) {
-                setFlashMessage({ text: "Correct!", isCorrect: true });
-                setPuzzleGrid((prevGrid) => {
-                    if (!prevGrid) 
-                        return prevGrid;
-
-                    const updatedCells = prevGrid.cells.map((row) =>
-                        row.map((cell) => {
-                            if (cell.sound.id === tableSoundId) {
-                                return { ...cell, isRevealed: true };
-                            }
-                            return cell;
-                        })
-                    );
-
-                    return { ...prevGrid, cells: updatedCells };
-                });
-                setSelectSoundId(null);
-                setTimeout(() => setFlashMessage(null), 3000);
-            }
-            else
-            {
-                setFlashMessage({ text: "Incorrect!", isCorrect: false });
-                setTimeout(() => setFlashMessage(null), 3000);
-            }
-        })
     };
 
     return (
-        <>
+        <div className="container puzzle-container">
             {flashMessage && (
-                <div style={{
-                    position: 'fixed',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    padding: '20px 40px',
-                    fontSize: '24px',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    backgroundColor: flashMessage.isCorrect ? 'green' : 'red',
-                    borderRadius: '8px',
-                    zIndex: 1000
-                }}>
+                <div className={`flash-message ${flashMessage.isCorrect ? 'success' : 'error'}`}>
                     {flashMessage.text}
                 </div>
             )}
-            <h1>
-                Musical Puzzle
-            </h1>
-            
-            <div>
+
+            <div className="page-header">
+                <h1 className="text-gradient">
+                    Musical Puzzle
+                </h1>
+                <p>Listen, identify, and reveal the hidden sounds</p>
+            </div>
+
+            <div className="puzzle-controls">
                 <select value={group} onChange={handleOnGroupChange}>
                     {GROUPS.map((grp) => (
-                        <option key={grp} value={grp}>{grp}</option>
+                        <option key={grp} value={grp}>Group {grp}</option>
                     ))}
                 </select>
 
@@ -173,42 +158,75 @@ const PuzzlePage: React.FC= () => {
                     ))}
                 </select>
             </div>
-            
-            <div>
-                <div>
+
+            <div className="puzzle-layout">
+                <div className="sounds-list">
                     {/* Scroll menu */}
                     {sounds.map((sound, index) => (
-                        <div key={`${sound.id}-${sound.name}-${index}`}>
-                            {sound.instrument} {sound.name}
-                            <button onClick={() => audioPlay(sound)}>Play</button>
-                            <button onClick={audioStop}>Stop</button>
-                            <button onClick={() => setSelectSoundId(sound.id)}>Select</button>
+                        <div 
+                            key={`${sound.id}-${sound.name}-${index}`} 
+                            className={`hover-card sound-card ${lastListenedSidebarId === sound.id ? 'last-listened' : ''}`}
+                        >
+                            <div className="sound-info">
+                                <span className="sound-instrument">{sound.instrument}</span>
+                                <span>{sound.name}</span>
+                            </div>
+                            <div className="sound-actions">
+                                <div className="playback-controls">
+                                    <button 
+                                        className="btn-secondary btn-icon" 
+                                        onClick={() => {
+                                            audioPlay(sound);
+                                            setLastListenedSidebarId(sound.id);
+                                        }}
+                                    >
+                                        ▶️
+                                    </button>
+                                    <button className="btn-secondary btn-icon" onClick={audioStop}>⏹️</button>
+                                </div>
+                                <button
+                                    className={selectedSoundId === sound.id ? "btn-select" : "btn-secondary btn-select"}
+                                    onClick={() => setSelectSoundId(selectedSoundId === sound.id ? null : sound.id)}
+                                >
+                                    {selectedSoundId === sound.id ? "Selected" : "Select"}
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
-                <div>
+
+                <div className="puzzle-grid-wrapper">
                     {/* Puzzle grid */}
                     {puzzleGrid ? (
-                        <table>
+                        <table className="puzzle-table">
                             <tbody>
                                 {puzzleGrid.cells.map((row, rowIndex) => (
                                     <tr key={`row-${rowIndex}`}>
                                         {row.map((cell, colIndex) => (
-                                            <td key={`cell-${rowIndex}-${colIndex}`}
-                                                style= { cell.isRevealed === false ? { border: '2px solid black', padding: '10px' } : { border: '2px solid green', padding: '10px' }}>
-                                                <div>
-                                                    <button onClick={() => audioPlay(cell.sound)}>
-                                                        Play
-                                                    </button>
-                                                    <button onClick={audioStop}>
-                                                        Stop
-                                                    </button>
+                                            <td key={`cell-${rowIndex}-${colIndex}`} className="puzzle-cell">
+                                                <div className={`cell-content ${cell.isRevealed ? 'cell-revealed' : 'cell-hidden'} ${lastListened?.row === rowIndex && lastListened?.col === colIndex ? 'last-listened' : ''}`}>
+                                                    <div className="cell-buttons">
+                                                        <div className="playback-controls">
+                                                            <button 
+                                                                className="btn-secondary btn-icon" 
+                                                                onClick={() => {
+                                                                    audioPlay(cell.sound);
+                                                                    setLastListened({ row: rowIndex, col: colIndex });
+                                                                }}
+                                                            >
+                                                                ▶️
+                                                            </button>
+                                                            <button className="btn-secondary btn-icon" onClick={audioStop}>
+                                                                ⏹️
+                                                            </button>
+                                                        </div>
 
-                                                    {(selectedSoundId !== null && cell.isRevealed === false) && (
-                                                        <button onClick={() => guessSelected(cell.sound.id, rowIndex, colIndex)}>
-                                                            Select
-                                                        </button>
-                                                    )}
+                                                        {(selectedSoundId !== null && !cell.isRevealed) && (
+                                                            <button className="btn-sm" onClick={() => guessSelected(cell.sound.id, rowIndex, colIndex)}>
+                                                                Guess
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                         ))}
@@ -217,11 +235,13 @@ const PuzzlePage: React.FC= () => {
                             </tbody>
                         </table>
                     ) : (
-                        <p>Loading puzzle...</p>
+                        <div className="flex-center" style={{ padding: '3rem' }}>
+                            <p className="text-muted">Loading puzzle...</p>
+                        </div>
                     )}
                 </div>
             </div>
-        </>
+        </div>
     );
 }
 

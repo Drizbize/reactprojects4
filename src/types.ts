@@ -41,16 +41,31 @@ export type CellPuzzleElement = {
     sound: Sound
 }
 
-export type Student = {
-    personIdentity: Person;
-    correctPlaced: number;
-    attempts: 0;
-    lastAttemptAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date | null;
-    banished: boolean;
-    banishedAt: Date | null;
-    reveals: [];
+export type RevealCell = {
+    cell: {
+        l: number;
+        c: number;
+        puzzleId: number;
+        sound: Sound;
+    };
+    createdAt: string;
+}
 
-    groupRevealsCount: number
+export type Student = {
+    name: string;
+    group: Group;
+    correctPlaced: number;
+    attempts: number;
+    lastAttemptAt: string | null;
+    createdAt: string;
+    updatedAt: string | null;
+    banished: boolean;
+    banishedAt: string | null;
+    reveals: RevealCell[];
+}
+
+export type StudentResponse = {
+    ok: boolean;
+    student: Student;
+    groupRevealsCount: number;
 }

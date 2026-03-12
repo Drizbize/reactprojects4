@@ -1,0 +1,114 @@
+/* Specific App Structure Styles */
+
+.app-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: rgba(18, 18, 20, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.app-navbar h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.app-navbar ul {
+    display: flex;
+    list-style: none;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+    align-items: center;
+}
+
+.app-navbar a {
+    font-weight: 500;
+    color: var(--text-muted);
+    position: relative;
+    padding-bottom: 0.25rem;
+}
+
+.app-navbar a:hover,
+.app-navbar a.active {
+    color: var(--text-main);
+    text-shadow: none;
+}
+
+.app-navbar a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 0;
+    background-color: var(--accent-secondary);
+    transition: width var(--transition-fast);
+}
+
+.app-navbar a:hover::after {
+    width: 100%;
+}
+
+.main-content {
+    min-height: calc(100vh - 80px);
+    /* 80px approx navbar height */
+    animation: fadeIn var(--transition-normal);
+}
+
+/* Flash Message */
+.flash-message {
+    position: fixed;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: white;
+    border-radius: var(--border-radius);
+    z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    animation: slideDown 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.flash-message.success {
+    background: linear-gradient(135deg, #00b09b, var(--success));
+}
+
+.flash-message.error {
+    background: linear-gradient(135deg, #cb2d3e, var(--error));
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
