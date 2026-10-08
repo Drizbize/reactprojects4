@@ -9,8 +9,9 @@
 ## Getting started
 
 ```bash
+cp .env.example .env   # API address, see VITE_API_SERVEUR
 npm install
 npm run dev
 ```
 
-The API address is set with the `VITE_API_SERVEUR` variable (`.env` file).
+The API address is set with the `VITE_API_SERVEUR` variable in the `.env` file (not tracked by git).
